@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const User = require('./User');
+const Worker = require('./Worker');
+const Client = require('./Client');
 
 const Booking = sequelize.define('Booking', {
   id: {
@@ -12,7 +13,7 @@ const Booking = sequelize.define('Booking', {
     type: DataTypes.UUID,
     allowNull: false,
     references: {
-      model: User,
+      model: Worker,
       key: 'id'
     }
   },
@@ -20,7 +21,7 @@ const Booking = sequelize.define('Booking', {
     type: DataTypes.UUID,
     allowNull: false,
     references: {
-      model: User,
+      model: Client,
       key: 'id'
     }
   },
@@ -54,7 +55,7 @@ const Booking = sequelize.define('Booking', {
 });
 
 // Define associations
-Booking.belongsTo(User, { foreignKey: 'workerId', as: 'worker' });
-Booking.belongsTo(User, { foreignKey: 'clientId', as: 'client' });
+Booking.belongsTo(Worker, { foreignKey: 'workerId', as: 'worker' });
+Booking.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
 
 module.exports = Booking;

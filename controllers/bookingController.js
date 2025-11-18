@@ -1,4 +1,4 @@
-const { Booking, User, Worker, Review } = require('../models');
+const { Booking, User, Worker, Review, Client } = require('../models');
 
 const createBooking = async (req, res) => {
   try {
@@ -15,10 +15,16 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ message: 'Worker not available' });
     }
 
+    // Get client profile
+    const client = await Client.findOne({ where: { userId: clientId } });
+    if (!client) {
+      return res.status(400).json({ message: 'Client profile not found' });
+    }
+
     // Create booking
     const booking = await Booking.create({
-      workerId,
-      clientId,
+      workerId: worker.id,
+      clientId: client.id,
       scheduledDate,
       scheduledTime,
       description,
@@ -43,9 +49,17 @@ const getBookings = async (req, res) => {
 
     let whereCondition = {};
     if (role === 'worker') {
-      whereCondition.workerId = userId;
+      // For workers, find their Worker profile first
+      const workerProfile = await Worker.findOne({ where: { userId } });
+      if (workerProfile) {
+        whereCondition.workerId = workerProfile.id;
+      }
     } else {
-      whereCondition.clientId = userId;
+      // For clients, find their Client profile first
+      const clientProfile = await Client.findOne({ where: { userId } });
+      if (clientProfile) {
+        whereCondition.clientId = clientProfile.id;
+      }
     }
 
     // Add filters
@@ -120,10 +134,20 @@ const updateBookingStatus = async (req, res) => {
     }
 
     // Check permissions
-    if (role === 'worker' && booking.workerId !== userId) {
-      return res.status(403).json({ message: 'Unauthorized' });
+    let hasPermission = false;
+    if (role === 'worker') {
+      const workerProfile = await Worker.findOne({ where: { userId } });
+      if (workerProfile && booking.workerId === workerProfile.id) {
+        hasPermission = true;
+      }
+    } else {
+      const clientProfile = await Client.findOne({ where: { userId } });
+      if (clientProfile && booking.clientId === clientProfile.id) {
+        hasPermission = true;
+      }
     }
-    if (role === 'client' && booking.clientId !== userId) {
+
+    if (!hasPermission) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -201,7 +225,8 @@ const createReview = async (req, res) => {
     }
 
     // Check if reviewer is the client
-    if (booking.clientId !== reviewerId) {
+    const clientProfile = await Client.findOne({ where: { userId: reviewerId } });
+    if (!clientProfile || booking.clientId !== clientProfile.id) {
       return res.status(403).json({ message: 'Only clients can review workers' });
     }
 
