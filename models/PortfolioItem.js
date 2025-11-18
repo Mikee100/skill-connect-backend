@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const User = require('./User');
+const Worker = require('./Worker');
 
 const PortfolioItem = sequelize.define('PortfolioItem', {
   id: {
@@ -9,10 +9,10 @@ const PortfolioItem = sequelize.define('PortfolioItem', {
     autoIncrement: true
   },
   workerId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: false,
     references: {
-      model: User,
+      model: Worker,
       key: 'id'
     }
   },
@@ -38,6 +38,6 @@ const PortfolioItem = sequelize.define('PortfolioItem', {
 });
 
 // Define associations
-PortfolioItem.belongsTo(User, { foreignKey: 'workerId', as: 'worker' });
+PortfolioItem.belongsTo(Worker, { foreignKey: 'workerId', as: 'worker' });
 
 module.exports = PortfolioItem;
