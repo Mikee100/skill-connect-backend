@@ -87,20 +87,28 @@ const getBookings = async (req, res) => {
 
     let includeOptions = [
       {
-        model: User,
+        model: Worker,
         as: 'worker',
-        attributes: ['id', 'name', 'email', 'phone', 'county', 'town', 'area', 'profileImage']
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'email', 'phone', 'county', 'town', 'area', 'profileImage']
+        }]
       },
       {
-        model: User,
+        model: Client,
         as: 'client',
-        attributes: ['id', 'name', 'email', 'phone', 'county', 'town', 'area', 'profileImage']
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['id', 'name', 'email', 'phone', 'county', 'town', 'area', 'profileImage']
+        }]
       }
     ];
 
     // Add client name filter if provided
     if (clientName && role === 'worker') {
-      includeOptions[1].where = {
+      includeOptions[1].include[0].where = {
         name: {
           [require('sequelize').Op.iLike]: `%${clientName}%`
         }
@@ -153,7 +161,7 @@ const updateBookingStatus = async (req, res) => {
 
     // If marking as completed, increment worker's completed jobs count
     if (status === 'completed' && booking.status !== 'completed') {
-      const worker = await Worker.findOne({ where: { userId: booking.workerId } });
+      const worker = await Worker.findOne({ where: { id: booking.workerId } });
       if (worker) {
         await worker.increment('completedJobs', { by: 1 });
       }
@@ -188,13 +196,15 @@ const getAvailableWorkers = async (req, res) => {
         {
           model: User,
           as: 'user',
-          where: location ? {
-            [require('sequelize').Op.or]: [
-              { county: location },
-              { town: location },
-              { area: location }
-            ]
-          } : {},
+          ...(location && {
+            where: {
+              [require('sequelize').Op.or]: [
+                { county: location },
+                { town: location },
+                { area: location }
+              ]
+            }
+          }),
           attributes: ['id', 'name', 'email', 'phone', 'county', 'town', 'area', 'profileImage']
         }
       ],
@@ -236,32 +246,35 @@ const createReview = async (req, res) => {
       return res.status(400).json({ message: 'Review already exists for this booking' });
     }
 
+    // Get the worker's user ID
+    const worker = await Worker.findOne({ where: { id: booking.workerId } });
+    if (!worker) {
+      return res.status(404).json({ message: 'Worker not found' });
+    }
+
     // Create review
     const review = await Review.create({
       bookingId,
       reviewerId,
-      revieweeId: booking.workerId,
+      revieweeId: worker.userId,
       rating,
       comment
     });
 
     // Update worker's rating and review count
-    const worker = await Worker.findOne({ where: { userId: booking.workerId } });
-    if (worker) {
-      const allReviews = await Review.findAll({
-        where: { revieweeId: booking.workerId },
-        attributes: ['rating']
-      });
+    const allReviews = await Review.findAll({
+      where: { revieweeId: worker.userId },
+      attributes: ['rating']
+    });
 
-      const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
-      const newRating = totalRating / allReviews.length;
-      const newReviewCount = allReviews.length;
+    const totalRating = allReviews.reduce((sum, r) => sum + r.rating, 0);
+    const newRating = totalRating / allReviews.length;
+    const newReviewCount = allReviews.length;
 
-      await worker.update({
-        rating: newRating,
-        reviewCount: newReviewCount
-      });
-    }
+    await worker.update({
+      rating: newRating,
+      reviewCount: newReviewCount
+    });
 
     res.status(201).json({
       message: 'Review created successfully',

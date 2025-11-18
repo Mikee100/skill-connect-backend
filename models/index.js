@@ -10,7 +10,7 @@ const Skill = require('./Skill');
 // Sync all models
 const syncDatabase = async () => {
   try {
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ alter: true });
     console.log('Database synchronized successfully.');
   } catch (error) {
     console.error('Error synchronizing database:', error);
